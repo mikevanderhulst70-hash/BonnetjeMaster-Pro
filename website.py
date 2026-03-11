@@ -15,15 +15,8 @@ if api_key:
     try:
         genai.configure(api_key=api_key)
 
-        # Stap 1: Lijst beschikbare modellen ophalen
-        models = [m.name for m in genai.list_models(
-        ) if 'generateContent' in m.supported_methods]
-        st.write("Beschikbare modellen voor jouw sleutel:", models)
-
-        # Stap 2: Model selectie op basis van beschikbare lijst
-        # Kies de meest relevante uit de lijst die je op het scherm ziet
-        model_name = 'gemini-1.5-flash'
-        model = genai.GenerativeModel(model_name)
+        # We gebruiken hier de meest standaard naamgeving
+        model = genai.GenerativeModel('gemini-1.5-flash')
 
         uploaded_files = st.file_uploader(
             "Upload je bonnetjes", accept_multiple_files=True)
@@ -61,6 +54,6 @@ if api_key:
                     "Download Excel", data=output.getvalue(), file_name="export.xlsx")
 
     except Exception as e:
-        st.error(f"Fout: {e}")
+        st.error(f"Configuratiefout: {e}")
 else:
     st.warning("Voer eerst je API-sleutel in de zijbalk in.")
