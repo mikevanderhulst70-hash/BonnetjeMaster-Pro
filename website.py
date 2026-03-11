@@ -18,18 +18,19 @@ with st.sidebar:
 if api_key:
     try:
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        # We gebruiken hier de meest recente stabiele versie zonder 'models/' prefix
+        model = genai.GenerativeModel('gemini-1.5-flash-002')
 
         uploaded_files = st.file_uploader("Upload je bonnetjes", type=[
                                           "jpg", "jpeg", "png"], accept_multiple_files=True)
 
-        if uploaded_files and st.button(" Start de Analyse"):
+        if uploaded_files and st.button(" Start Analyse"):
             all_data = []
             for file in uploaded_files:
                 st.write(f"Bezig met: {file.name}...")
                 try:
                     img = PIL.Image.open(file)
-                    prompt = "Geef alleen: Winkel | Datum | Totaalbedrag | BTW_Bedrag | Categorie"
+                    prompt = "Extract these fields: Winkel, Datum, Totaalbedrag, BTW_Bedrag, Categorie. Format as: Winkel | Datum | Totaalbedrag | BTW_Bedrag | Categorie"
                     response = model.generate_content([prompt, img])
                     res_text = response.text.strip()
                     parts = res_text.split(" | ")
@@ -50,15 +51,14 @@ if api_key:
                 df = pd.DataFrame(all_data)
                 st.table(df)
 
-                # Simpele Excel export
                 output = BytesIO()
                 df.to_excel(output, index=False)
                 st.download_button(
                     " Download Excel", data=output.getvalue(), file_name="export.xlsx")
                 st.balloons()
 
-    except Exception as general_error:
-        st.error(f"Fout bij opstarten: {general_error}")
+    except Exception as e:
+        st.error(f"Configuratiefout: {e}")
 else:
     st.warning(
-        " Voer eerst je API-sleutel die je kan vinden op https://aistudio.google.com/ in de zijbalk in.")
+        " Voer eerst je API-sleutel( die is tevinden op aistudio.google.com) in de zijbalk in.")
