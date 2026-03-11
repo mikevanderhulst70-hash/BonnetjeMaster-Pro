@@ -4,33 +4,37 @@ import PIL.Image
 import pandas as pd
 from io import BytesIO
 
-# 1. Pagina instellingen
 st.set_page_config(page_title="BonnetjeMaster Pro", layout="wide")
-st.title(" BonnetjeMaster Pro")
+st.title("BonnetjeMaster Pro")
 
-# 2. Zijbalk voor API-sleutel
 with st.sidebar:
-    st.header(" Activatie")
+    st.header("Activatie")
     api_key = st.text_input("Voer je Gemini API Key in", type="password")
-    st.info("Haal je sleutel op bij: aistudio.google.com")
 
-# 3. Hoofdprogramma
 if api_key:
     try:
         genai.configure(api_key=api_key)
-        # We gebruiken hier de meest recente stabiele versie zonder 'models/' prefix
-        model = genai.GenerativeModel('gemini-1.5-flash-002')
 
-        uploaded_files = st.file_uploader("Upload je bonnetjes", type=[
-                                          "jpg", "jpeg", "png"], accept_multiple_files=True)
+        # Stap 1: Lijst beschikbare modellen ophalen
+        models = [m.name for m in genai.list_models(
+        ) if 'generateContent' in m.supported_methods]
+        st.write("Beschikbare modellen voor jouw sleutel:", models)
 
-        if uploaded_files and st.button(" Start Analyse"):
+        # Stap 2: Model selectie op basis van beschikbare lijst
+        # Kies de meest relevante uit de lijst die je op het scherm ziet
+        model_name = 'gemini-1.5-flash'
+        model = genai.GenerativeModel(model_name)
+
+        uploaded_files = st.file_uploader(
+            "Upload je bonnetjes", accept_multiple_files=True)
+
+        if uploaded_files and st.button("Start Analyse"):
             all_data = []
             for file in uploaded_files:
                 st.write(f"Bezig met: {file.name}...")
                 try:
                     img = PIL.Image.open(file)
-                    prompt = "Extract these fields: Winkel, Datum, Totaalbedrag, BTW_Bedrag, Categorie. Format as: Winkel | Datum | Totaalbedrag | BTW_Bedrag | Categorie"
+                    prompt = "Geef alleen: Winkel | Datum | Totaalbedrag | BTW_Bedrag | Categorie"
                     response = model.generate_content([prompt, img])
                     res_text = response.text.strip()
                     parts = res_text.split(" | ")
@@ -54,11 +58,9 @@ if api_key:
                 output = BytesIO()
                 df.to_excel(output, index=False)
                 st.download_button(
-                    " Download Excel", data=output.getvalue(), file_name="export.xlsx")
-                st.balloons()
+                    "Download Excel", data=output.getvalue(), file_name="export.xlsx")
 
     except Exception as e:
-        st.error(f"Configuratiefout: {e}")
+        st.error(f"Fout: {e}")
 else:
-    st.warning(
-        " Voer eerst je API-sleutel( die is tevinden op aistudio.google.com) in de zijbalk in.")
+    st.warning("Voer eerst je API-sleutel in de zijbalk in.")
