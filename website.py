@@ -4,22 +4,18 @@ import PIL.Image
 import pandas as pd
 from io import BytesIO
 
-# Pagina configuratie
 st.set_page_config(page_title="BonnetjeMaster Pro", layout="wide")
 st.title("BonnetjeMaster Pro")
 
-# Configuratie sidebar
 with st.sidebar:
     st.header("Instellingen")
     api_key = st.text_input("Voer je Gemini API Key in", type="password")
-    st.write("Zorg dat je in Google AI Studio toegang hebt tot Gemini 1.5 modellen.")
 
-# Hoofdprogramma
 if api_key:
     try:
         genai.configure(api_key=api_key)
 
-        # Gebruik de meest universele modelnaam
+        # We gebruiken een algemene aanroep zonder expliciet pad
         model = genai.GenerativeModel('gemini-1.5-flash')
 
         uploaded_files = st.file_uploader("Upload je bonnetjes", type=[
@@ -27,17 +23,19 @@ if api_key:
 
         if uploaded_files and st.button("Start Analyse"):
             all_data = []
-
             for file in uploaded_files:
                 st.write(f"Verwerken: {file.name}")
                 try:
                     img = PIL.Image.open(file)
-                    prompt = "Extract de volgende gegevens: Winkel, Datum, Totaalbedrag, BTW_Bedrag, Categorie. Geef het resultaat in dit formaat: Winkel | Datum | Totaalbedrag | BTW_Bedrag | Categorie"
+                    # We gebruiken een striktere prompt
+                    prompt = "Extraheer de gegevens: Winkel, Datum, Totaalbedrag, BTW_Bedrag, Categorie. Geef terug in formaat: Winkel | Datum | Totaalbedrag | BTW_Bedrag | Categorie"
 
-                    response = model.generate_content([prompt, img])
-                    res_text = response.text.strip()
-                    parts = res_text.split(" | ")
+                    response = model.generate_content(
+                        contents=[prompt, img],
+                        generation_config={"temperature": 0.2}
+                    )
 
+                    parts = response.text.strip().split(" | ")
                     if len(parts) >= 4:
                         all_data.append({
                             "Bestand": file.name,
@@ -59,11 +57,7 @@ if api_key:
                     df.to_excel(writer, index=False)
 
                 st.download_button(
-                    label="Download Excel",
-                    data=output.getvalue(),
-                    file_name="bonnetjes_data.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
+                    "Download Excel", data=output.getvalue(), file_name="export.xlsx")
     except Exception as e:
         st.error(f"Systeemfout: {e}")
 else:
