@@ -5,100 +5,69 @@ import pandas as pd
 from io import BytesIO
 
 # --- CONFIGURATIE ---
-st.set_page_config(page_title="BonnetjeMaster Pro",
-                   layout="wide", page_icon="💰")
+st.set_page_config(page_title="BonnetjeMaster Pro", layout="wide")
 
-# --- JOUW API KEY (HIER PLAKKEN) ---
-MY_SECRET_KEY = "AIzaSy..."  # <--- VERVANG DIT DOOR JOUW SLEUTEL
-# ----------------------------------
-
-# Initialiseer Gemini
-if MY_SECRET_KEY != "AIzaSy...":
-    genai.configure(api_key=MY_SECRET_KEY)
-    model = genai.GenerativeModel('gemini-pro-vision')
-
-# --- UI DESIGN ---
 st.title("🏆 BonnetjeMaster Pro")
-st.markdown("""
-    *Scan meerdere bonnetjes tegelijk, bereken BTW en exporteer direct naar Excel.*
-    ---
-""")
 
-# Zijbalk voor instellingen
+# --- ZIJBALK ---
 with st.sidebar:
-    st.header("⚙️ Instellingen")
-    st.info("De API-key is geladen uit de beveiligde instellingen.")
-    export_format = st.selectbox(
-        "Export formaat", ["Excel (.xlsx)", "CSV (.csv)"])
-    st.write("---")
-    st.write("© 2026 BonnetjeMaster Business")
+    st.header("🔑 Activatie")
+    api_key = st.text_input("Voer je Gemini API Key in", type="password")
+    st.info("Haal je sleutel op via: aistudio.google.com")
 
-# Bestanden uploaden
-uploaded_files = st.file_uploader(
-    "Selecteer je bonnetjes (meerdere tegelijk mogelijk)",
-    type=["jpg", "jpeg", "png"],
-    accept_multiple_files=True
-)
+# --- HIER GEBEURT HET ---
+if api_key:
+    try:
+        # Initialiseer de AI DIRECT nadat de sleutel is ingevoerd
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-1.5-flash-latest')
 
-if uploaded_files:
-    st.success(f"✅ {len(uploaded_files)} bestanden klaar voor analyse.")
+        uploaded_files = st.file_uploader("Upload je bonnetjes", type=[
+                                          "jpg", "jpeg", "png"], accept_multiple_files=True)
 
-    if st.button("🚀 Start Analyse & Bereken BTW"):
-        all_data = []
-        progress_bar = st.progress(0)
+        if uploaded_files and st.button("🚀 Start Analyse"):
+            all_data = []
+            progress_bar = st.progress(0)
 
-        for index, file in enumerate(uploaded_files):
-            # Status update
-            st.write(f"Bezig met analyseren: **{file.name}**...")
+            for index, file in enumerate(uploaded_files):
+                st.write(f"Bezig met: {file.name}...")
+                img = PIL.Image.open(file)
 
-            # Afbeelding inladen
-            img = PIL.Image.open(file)
+                # De opdracht aan de AI
+                prompt = "Winkel | Datum | Totaalbedrag | BTW_Bedrag | Categorie. Geef alleen deze regel."
 
-            # Prompt voor de AI (Geld verdienen = details weten!)
-            prompt = """
-            Analyseer dit bonnetje en geef de volgende gegevens terug in dit exacte formaat:
-            Winkel | Datum | Totaalbedrag | BTW_Bedrag | Categorie
-            
-            Voorbeeld: 
-            Albert Heijn | 24-02-2024 | 15.50 | 1.28 | Boodschappen
-            
-            Geef alleen de tekst terug, geen extra uitleg.
-            """
+                try:
+                    # Hier gebruiken we 'model' die hierboven is gedefinieerd
+                    response = model.generate_content([prompt, img])
+                    data_line = response.text.strip().split(" | ")
 
-            try:
-                response = model.generate_content([prompt, img])
-                data_line = response.text.strip().split(" | ")
+                    if len(data_line) >= 4:
+                        all_data.append({
+                            "Bestand": file.name,
+                            "Winkel": data_line[0],
+                            "Datum": data_line[1],
+                            "Totaal": data_line[2],
+                            "BTW": data_line[3],
+                            "Categorie": data_line[4] if len(data_line) > 4 else "Diversen"
+                        })
+                except Exception as e:
+                    st.error(f"Fout bij {file.name}: {e}")
 
-                if len(data_line) == 5:
-                    all_data.append({
-                        "Bestand": file.name,
-                        "Winkel": data_line[0],
-                        "Datum": data_line[1],
-                        "Totaal": data_line[2],
-                        "BTW": data_line[3],
-                        "Categorie": data_line[4]
-                    })
-            except Exception as e:
-                st.error(f"Foutje bij {file.name}: {e}")
+                progress_bar.progress((index + 1) / len(uploaded_files))
 
-            # Update voortgang
-            progress_bar.progress((index + 1) / len(uploaded_files))
+            if all_data:
+                df = pd.DataFrame(all_data)
+                st.table(df)
 
-        # Resultaten tonen
-        if all_data:
-            st.write("---")
-            st.subheader("📊 Overzicht resultaten")
-            df = pd.DataFrame(all_data)
-            st.table(df)
+                # Excel knop
+                towrite = BytesIO()
+                df.to_excel(towrite, index=False)
+                towrite.seek(0)
+                st.download_button("📥 Download Excel",
+                                   data=towrite, file_name="export.xlsx")
+                st.balloons()
 
-            # Excel export knop
-            towrite = BytesIO()
-            df.to_excel(towrite, index=False, header=True)
-            towrite.seek(0)
-            st.download_button(
-                label="📥 Download Excel Export voor Boekhouder",
-                data=towrite,
-                file_name="bonnetjes_export.xlsx",
-                mime="application/vnd.ms-excel"
-            )
-            st.balloons()
+    except Exception as e:
+        st.error(f"Sleutel fout: {e}")
+else:
+    st.warning("👈 Vul eerst je API-sleutel in de zijbalk in om te beginnen.")
