@@ -4,30 +4,36 @@ import PIL.Image
 import pandas as pd
 from io import BytesIO
 
+# Pagina configuratie
 st.set_page_config(page_title="BonnetjeMaster Pro", layout="wide")
 st.title("BonnetjeMaster Pro")
 
+# Configuratie sidebar
 with st.sidebar:
-    st.header("Activatie")
+    st.header("Instellingen")
     api_key = st.text_input("Voer je Gemini API Key in", type="password")
+    st.write("Zorg dat je in Google AI Studio toegang hebt tot Gemini 1.5 modellen.")
 
+# Hoofdprogramma
 if api_key:
     try:
         genai.configure(api_key=api_key)
 
-        # We gebruiken hier de meest standaard naamgeving
+        # Gebruik de meest universele modelnaam
         model = genai.GenerativeModel('gemini-1.5-flash')
 
-        uploaded_files = st.file_uploader(
-            "Upload je bonnetjes", accept_multiple_files=True)
+        uploaded_files = st.file_uploader("Upload je bonnetjes", type=[
+                                          "jpg", "jpeg", "png"], accept_multiple_files=True)
 
         if uploaded_files and st.button("Start Analyse"):
             all_data = []
+
             for file in uploaded_files:
-                st.write(f"Bezig met: {file.name}...")
+                st.write(f"Verwerken: {file.name}")
                 try:
                     img = PIL.Image.open(file)
-                    prompt = "Geef alleen: Winkel | Datum | Totaalbedrag | BTW_Bedrag | Categorie"
+                    prompt = "Extract de volgende gegevens: Winkel, Datum, Totaalbedrag, BTW_Bedrag, Categorie. Geef het resultaat in dit formaat: Winkel | Datum | Totaalbedrag | BTW_Bedrag | Categorie"
+
                     response = model.generate_content([prompt, img])
                     res_text = response.text.strip()
                     parts = res_text.split(" | ")
@@ -49,11 +55,16 @@ if api_key:
                 st.table(df)
 
                 output = BytesIO()
-                df.to_excel(output, index=False)
-                st.download_button(
-                    "Download Excel", data=output.getvalue(), file_name="export.xlsx")
+                with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                    df.to_excel(writer, index=False)
 
+                st.download_button(
+                    label="Download Excel",
+                    data=output.getvalue(),
+                    file_name="bonnetjes_data.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
     except Exception as e:
-        st.error(f"Configuratiefout: {e}")
+        st.error(f"Systeemfout: {e}")
 else:
-    st.warning("Voer eerst je API-sleutel in de zijbalk in.")
+    st.warning("Voer je API-sleutel in om te starten.")
